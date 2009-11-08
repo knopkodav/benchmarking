@@ -33,25 +33,28 @@ def flush_mysql mysql
     `coords_id` int unsigned not null,
     PRIMARY KEY (`id`)
   )")
+  # empty init entries
+  mysql.query("INSERT insert_bm_coords(x,y) VALUES(0, 0)")
+  mysql.query("INSERT insert_bm(text, count, coords_id) VALUES('', 0, #{mysql.insert_id()})")
 end
 
-def flush_mongo mongo
-  mongo.remove
+def flush_mongo mongo_cnn
+  mongo_cnn.collection("bmdb").drop
+  mongo = mongo_cnn.collection("bmdb")
+  mongo.insert({"stub" => "i am empty init doc"})
+  mongo
 end
 
 mysql = Mysql.new('localhost', 'testuser', 'testpass', 'test')
-
 mongo_cnn = Connection.new.db("ruby_db")
-mongo_cnn.collection("bmdb").drop
-mongo = mongo_cnn.collection("bmdb")
 
 # do benchmarking
 Benchmark.bm {|x|
-  points = [1_000, 10_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000]
+  points = [1_000, 10_000, 100_000, 500_000, 1_000_000]
 
   points.each{|c|
     flush_mysql mysql
-    flush_mongo mongo
+    mongo = flush_mongo(mongo_cnn)
     
     x.report("mysql #{c.to_s} :") {
       cycle(c){|doc|
@@ -61,12 +64,6 @@ Benchmark.bm {|x|
     }
 
     x.report("mongo #{c.to_s} :") {
-      cycle(c){|doc|
-        mongo.insert(doc)
-      }
-    }
-    
-    x.report("php #{c.to_s} :") {
       cycle(c){|doc|
         mongo.insert(doc)
       }
